@@ -1,0 +1,692 @@
+; ═══════════════════════════════════════════════════════════════════════════
+;                        GTA5 ENHANCED - PROFESSIONAL SCRIPT
+; ═══════════════════════════════════════════════════════════════════════════
+; Author: Custom GTA5 Enhancement Suite
+; Version: 1.1
+; Description: Weapon switching and automation for GTA5
+; 
+; CONTROLS:
+;   F1  - Toggle Script ON/OFF
+;   F2  - Show/Hide Main GUI
+;   F3  - Auto Buy Ammo (All Weapons)
+;   R   - Rocket Quick-Switch (C4 → Rocket)
+;   N   - Sniper Quick-Switch (C4 → Sniper)
+; ═══════════════════════════════════════════════════════════════════════════
+
+; ═══════════════════════════════════════════════════════════════════════════
+; PERFORMANCE OPTIMIZATION SETTINGS
+; ═══════════════════════════════════════════════════════════════════════════
+#NoEnv
+#SingleInstance Force
+#MaxHotkeysPerInterval 99000000
+#HotkeyInterval 99000000
+#KeyHistory 0
+#WinActivateForce
+ListLines Off
+Process, Priority, , A
+SetBatchLines, -1
+SetKeyDelay, -1, -1
+SetMouseDelay, -1
+SetDefaultMouseSpeed, 0
+SetWinDelay, -1
+SetControlDelay, -1
+SendMode Input
+
+; ═══════════════════════════════════════════════════════════════════════════
+; GLOBAL CONFIGURATION
+; ═══════════════════════════════════════════════════════════════════════════
+global scriptEnabled := false
+global ScriptName := "GTA5 Enhanced"
+global Version := "v1.1"
+global gta5Detected := false
+global gta5ProcessID := 0
+global loadingComplete := false
+
+; Weapon slot configuration
+global WEAPON_SLOT_C4 := "5"
+global WEAPON_SLOT_ROCKET := "4"
+global WEAPON_SLOT_SNIPER := "9"
+
+; Timing configuration (FASTER WEAPON SWITCHING)
+global QUICK_SWITCH_DELAY := 0
+global MENU_NAV_DELAY := 50
+global MENU_ACTION_DELAY := 100
+
+; GUI configuration
+global GUI_FADE_SPEED := 15
+global GUI_AUTO_HIDE_TIME := 8000
+
+; Feature usage tracking
+global rocketUseCount := 0
+global sniperUseCount := 0
+global ammoUseCount := 0
+
+; Loading sequence variables
+global loadingStep := 0
+global loadingProgress := 0
+global loadingScanDots := ""
+
+; ═══════════════════════════════════════════════════════════════════════════
+; INITIALIZATION & STARTUP SEQUENCE
+; ═══════════════════════════════════════════════════════════════════════════
+ShowLoadingScreen()
+return
+
+; ═══════════════════════════════════════════════════════════════════════════
+; LOADING SCREEN
+; ═══════════════════════════════════════════════════════════════════════════
+
+ShowLoadingScreen() {
+    global
+    
+    Gui, Loading:New, +AlwaysOnTop +ToolWindow -Caption +LastFound +E0x20
+    Gui, Loading:Color, 0a0a0a
+    WinSet, Transparent, 250
+    
+    SysGet, ScreenWidth, 78
+    SysGet, ScreenHeight, 79
+    centerX := ScreenWidth // 2
+    centerY := ScreenHeight // 2
+    
+    Gui, Loading:Font, s28 bold c00FF88, Segoe UI
+    Gui, Loading:Add, Text, % "x" (centerX - 250) " y" (centerY - 200) " w500 Center vLoadTitle", ▰▰▰ GTA5 ENHANCED ▰▰▰
+    
+    Gui, Loading:Font, s11 norm c00DDFF, Segoe UI
+    Gui, Loading:Add, Text, % "x" (centerX - 200) " y" (centerY - 155) " w400 Center vLoadSubtitle", Weapon Enhancement System
+    
+    Gui, Loading:Font, s9 bold cFFFFFF, Segoe UI
+    Gui, Loading:Add, Text, % "x" (centerX - 50) " y" (centerY - 120) " w100 Center vLoadVersionBadge", [ v1.1 ]
+    
+    Gui, Loading:Font, s8 c00FF88, Segoe UI
+    Gui, Loading:Add, Text, % "x" (centerX - 300) " y" (centerY - 95) " w600 Center", ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    
+    Gui, Loading:Font, s12 bold cFFFFFF, Segoe UI
+    Gui, Loading:Add, Text, % "x" (centerX - 280) " y" (centerY - 55) " w560 h40 Center 0x200 vLoadStatus", ⚙ Initializing...
+    
+    Gui, Loading:Font, s9 c00DDFF, Segoe UI
+    Gui, Loading:Add, Text, % "x" (centerX - 250) " y" (centerY - 5) " w500 Center vLoadDetail", Checking system components...
+    
+    Gui, Loading:Font, s1 c333333, Segoe UI
+    Gui, Loading:Add, Text, % "x" (centerX - 300) " y" (centerY + 35) " w600 h30 0x10 Background1a1a1a"
+    
+    Gui, Loading:Font, s10 c00FF88, Segoe UI
+    Gui, Loading:Add, Text, % "x" (centerX - 295) " y" (centerY + 38) " w0 h24 vLoadBarFill Background00FF88"
+    
+    Gui, Loading:Font, s11 bold cFFFFFF, Segoe UI
+    Gui, Loading:Add, Text, % "x" (centerX - 300) " y" (centerY + 40) " w600 h20 Center BackgroundTrans vLoadPercent", 0`%
+    
+    Gui, Loading:Font, s10 bold cFFAA00, Segoe UI
+    Gui, Loading:Add, Text, % "x" (centerX - 300) " y" (centerY + 85) " w600 h50 Center vGTA5DetectionBox", ┌─────────────────────────────────────────┐`n│  🔍 Scanning for GTA5...         │`n└─────────────────────────────────────────┘
+    
+    Gui, Loading:Font, s8 c666666, Segoe UI
+    Gui, Loading:Add, Text, % "x" (centerX - 300) " y" (centerY + 150) " w200 vSystemInfo", ⚡ CPU: Optimized`n💾 RAM: Ready`n🎮 Input: Active
+    
+    Gui, Loading:Font, s8 c888888, Segoe UI
+    Gui, Loading:Add, Text, % "x" (centerX + 50) " y" (centerY + 150) " w250 vFeaturesList", ┌ Loading Features ┐`n│ ⬜ Weapon Switching │`n│ ⬜ Auto Ammo       │`n│ ⬜ GUI Interface   │`n│ ⬜ Stats Tracking  │`n└──────────────────┘
+    
+    Gui, Loading:Font, s8 c00FF88, Segoe UI
+    Gui, Loading:Add, Text, % "x" (centerX - 300) " y" (centerY + 215) " w600 Center", ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    
+    Gui, Loading:Font, s7 c666666, Segoe UI
+    Gui, Loading:Add, Text, % "x" (centerX - 250) " y" (centerY + 230) " w500 Center", Weapon Enhancement Script
+    
+    Gui, Loading:Show, x0 y0 w%ScreenWidth% h%ScreenHeight% NoActivate, GTA5 Enhanced Loading
+    
+    SetTimer, LoadingSequence, 80
+}
+
+LoadingSequence:
+    ; Use global variables instead of static
+    global loadingStep, loadingProgress, loadingScanDots
+    global gta5Detected, gta5ProcessID, loadingComplete
+    
+    ; Initialize on first run
+    if (loadingStep = "")
+        loadingStep := 0
+    if (loadingProgress = "")
+        loadingProgress := 0
+    if (loadingScanDots = "")
+        loadingScanDots := ""
+    
+    loadingStep++
+    
+    if (loadingStep <= 6) {
+        loadingProgress := loadingStep * 2.5
+        GuiControl, Loading:Font, s12 bold c00DDFF
+        GuiControl, Loading:, LoadStatus, ⚙ Initializing...
+        GuiControl, Loading:, LoadDetail, % "Loading module " . loadingStep . " of 6..."
+        UpdateProgressBar(loadingProgress)
+        SoundBeep, 400 + (loadingStep * 80), 25
+    }
+    else if (loadingStep <= 10) {
+        loadingProgress := 15 + ((loadingStep - 6) * 2.5)
+        GuiControl, Loading:Font, s12 bold cFFAA00
+        GuiControl, Loading:, LoadStatus, 🔒 Verifying integrity...
+        GuiControl, Loading:, LoadDetail, Running security protocols...
+        UpdateProgressBar(loadingProgress)
+        if (Mod(loadingStep, 2) = 0)
+            SoundBeep, 700, 20
+    }
+    else if (loadingStep <= 22) {
+        loadingProgress := 25 + ((loadingStep - 10) * 2.5)
+        
+        loadingScanDots .= "."
+        if (StrLen(loadingScanDots) > 6)
+            loadingScanDots := "."
+        
+        GuiControl, Loading:Font, s12 bold cFFFFFF
+        GuiControl, Loading:, LoadStatus, % "🎮 Detecting GTA5" . loadingScanDots
+        GuiControl, Loading:, LoadDetail, Scanning running processes...
+        
+        if (loadingStep = 16) {
+            Process, Exist, GTA5.exe
+            if (ErrorLevel > 0) {
+                gta5Detected := true
+                gta5ProcessID := ErrorLevel
+                
+                GuiControl, Loading:Font, s12 bold c00FF88
+                GuiControl, Loading:, LoadStatus, ✅ GTA5 Detected
+                GuiControl, Loading:, LoadDetail, Process locked and ready
+                
+                Gui, Loading:Font, s10 bold c00FF88, Segoe UI
+                GuiControl, Loading:Font, GTA5DetectionBox
+                GuiControl, Loading:, GTA5DetectionBox, ┌─────────────────────────────────────────┐`n│    ✅ GTA5.EXE • PID: %gta5ProcessID%      │`n│       🟢 STATUS: Connected         │`n└─────────────────────────────────────────┘
+                
+                SoundBeep, 1000, 80
+                Sleep, 40
+                SoundBeep, 1200, 80
+                Sleep, 40
+                SoundBeep, 1500, 100
+                Sleep, 40
+                SoundBeep, 1800, 120
+            } else {
+                gta5Detected := false
+                gta5ProcessID := 0
+                
+                GuiControl, Loading:Font, s12 bold cFFAA00
+                GuiControl, Loading:, LoadStatus, ⚠ GTA5 Not Detected
+                GuiControl, Loading:, LoadDetail, Script will activate when GTA5 starts
+                
+                Gui, Loading:Font, s10 bold cFFAA00, Segoe UI
+                GuiControl, Loading:Font, GTA5DetectionBox
+                GuiControl, Loading:, GTA5DetectionBox, ┌─────────────────────────────────────────┐`n│       ⚠ GTA5.EXE Not Found        │`n│    🔴 STATUS: Waiting for game    │`n└─────────────────────────────────────────┘
+                
+                SoundBeep, 800, 100
+                Sleep, 50
+                SoundBeep, 600, 100
+            }
+            Sleep, 800
+        }
+        
+        UpdateProgressBar(loadingProgress)
+        if (loadingStep > 16 && Mod(loadingStep, 3) = 0)
+            SoundBeep, 800 + ((loadingStep - 16) * 40), 20
+    }
+    else if (loadingStep <= 34) {
+        loadingProgress := 55 + ((loadingStep - 22) * 2.5)
+        
+        featureStep := loadingStep - 22
+        if (featureStep <= 3) {
+            feature := "🚀 Rocket Quick-Switch"
+            GuiControl, Loading:, FeaturesList, ┌ Loading Features ┐`n│ ✅ Weapon Switching │`n│ ⬜ Auto Ammo       │`n│ ⬜ GUI Interface   │`n│ ⬜ Stats Tracking  │`n└──────────────────┘
+        } else if (featureStep <= 6) {
+            feature := "💰 Auto Ammo Purchase"
+            GuiControl, Loading:, FeaturesList, ┌ Loading Features ┐`n│ ✅ Weapon Switching │`n│ ✅ Auto Ammo       │`n│ ⬜ GUI Interface   │`n│ ⬜ Stats Tracking  │`n└──────────────────┘
+        } else if (featureStep <= 9) {
+            feature := "🎨 GUI Interface"
+            GuiControl, Loading:, FeaturesList, ┌ Loading Features ┐`n│ ✅ Weapon Switching │`n│ ✅ Auto Ammo       │`n│ ✅ GUI Interface   │`n│ ⬜ Stats Tracking  │`n└──────────────────┘
+        } else {
+            feature := "📊 Statistics"
+            GuiControl, Loading:, FeaturesList, ┌ Loading Features ┐`n│ ✅ Weapon Switching │`n│ ✅ Auto Ammo       │`n│ ✅ GUI Interface   │`n│ ✅ Stats Tracking  │`n└──────────────────┘
+        }
+        
+        GuiControl, Loading:Font, s12 bold c00DDFF
+        GuiControl, Loading:, LoadStatus, ⚡ Loading features...
+        GuiControl, Loading:, LoadDetail, % "Installing: " . feature
+        
+        UpdateProgressBar(loadingProgress)
+        if (Mod(loadingStep, 2) = 0)
+            SoundBeep, 1000 + ((loadingStep - 22) * 30), 20
+    }
+    else if (loadingStep <= 40) {
+        loadingProgress := 85 + ((loadingStep - 34) * 2.5)
+        GuiControl, Loading:Font, s12 bold cFF00FF
+        GuiControl, Loading:, LoadStatus, 🚀 Optimizing...
+        GuiControl, Loading:, LoadDetail, Applying speed settings...
+        
+        GuiControl, Loading:, SystemInfo, ⚡ CPU: Optimized`n💾 RAM: Ready`n🎮 Input: Fast Mode
+        
+        UpdateProgressBar(loadingProgress)
+        if (Mod(loadingStep, 2) = 0)
+            SoundBeep, 1200 + ((loadingStep - 34) * 50), 18
+    }
+    else if (loadingStep = 41) {
+        loadingProgress := 100
+        UpdateProgressBar(loadingProgress)
+        
+        GuiControl, Loading:Font, s14 bold c00FF88
+        GuiControl, Loading:, LoadStatus, 🎉 Loading Complete
+        GuiControl, Loading:, LoadDetail, Press F1 to activate • Press F2 to show interface
+        
+        SoundBeep, 800, 70
+        Sleep, 30
+        SoundBeep, 1000, 70
+        Sleep, 30
+        SoundBeep, 1200, 70
+        Sleep, 30
+        SoundBeep, 1500, 90
+        Sleep, 30
+        SoundBeep, 1800, 110
+        
+        Loop, 4 {
+            WinSet, Transparent, 255, GTA5 Enhanced Loading
+            Sleep, 80
+            WinSet, Transparent, 250, GTA5 Enhanced Loading
+            Sleep, 80
+        }
+        
+        loadingComplete := true
+        SetTimer, LoadingSequence, Off
+        SetTimer, CloseLoadingScreen, -2500
+    }
+    return
+
+UpdateProgressBar(percent) {
+    global
+    
+    percentText := percent . "%"
+    GuiControl, Loading:, LoadPercent, %percentText%
+    
+    barWidth := Floor(590 * percent / 100)
+    
+    SysGet, ScreenWidth, 78
+    SysGet, ScreenHeight, 79
+    centerX := ScreenWidth // 2
+    centerY := ScreenHeight // 2
+    
+    GuiControl, Loading:Move, LoadBarFill, % "x" (centerX - 295) " y" (centerY + 38) " w" barWidth " h24"
+    
+    if (percent < 30)
+        GuiControl, Loading:+BackgroundFF4444, LoadBarFill
+    else if (percent < 60)
+        GuiControl, Loading:+BackgroundFFAA00, LoadBarFill
+    else if (percent < 90)
+        GuiControl, Loading:+Background00DDFF, LoadBarFill
+    else
+        GuiControl, Loading:+Background00FF88, LoadBarFill
+}
+
+CloseLoadingScreen:
+    Loop, 25 {
+        opacity := 250 - (A_Index * 10)
+        WinSet, Transparent, %opacity%, GTA5 Enhanced Loading
+        Sleep, 20
+    }
+    Gui, Loading:Destroy
+    InitializeScript()
+    return
+
+InitializeScript() {
+    global
+    
+    CreateMiniIndicator()
+    
+    Gui, Status:New, +AlwaysOnTop +ToolWindow -Caption +LastFound +E0x20
+    Gui, Status:Color, 0F0F0F
+    
+    Gui, Status:Font, s12 bold cFFFFFF, Segoe UI
+    Gui, Status:Add, Text, x20 y15 w280 vTitle, ⚡ GTA5 ENHANCED
+    
+    Gui, Status:Font, s8 norm c888888, Segoe UI
+    Gui, Status:Add, Text, x220 y20 w80 vVersionText Right, v1.1
+    
+    if (gta5Detected) {
+        Gui, Status:Font, s7 bold c00FF88, Segoe UI
+        Gui, Status:Add, Text, x20 y35 w280 Center vGTA5Status, ✅ GTA5 Connected
+    } else {
+        Gui, Status:Font, s7 bold cFFAA00, Segoe UI
+        Gui, Status:Add, Text, x20 y35 w280 Center vGTA5Status, ⚠ GTA5 Not Detected
+    }
+    
+    Gui, Status:Font, s1 c00FF88, Segoe UI
+    Gui, Status:Add, Text, x20 y50 w280 h2 0x10 Background333333
+    
+    Gui, Status:Font, s16 bold cFF4444, Segoe UI
+    Gui, Status:Add, Text, x20 y60 w35 h35 vStatusIcon Center, ●
+    
+    Gui, Status:Font, s13 bold cFF4444, Segoe UI
+    Gui, Status:Add, Text, x60 y67 w240 vStatusText, DISABLED
+    
+    Gui, Status:Font, s7 norm c666666, Segoe UI
+    Gui, Status:Add, Text, x20 y105 w280, ═══════════ USAGE STATS ═══════════
+    Gui, Status:Font, s8 norm c888888, Segoe UI
+    Gui, Status:Add, Text, x20 y120 w280 vRocketStats, 🚀 Rockets: 0
+    Gui, Status:Add, Text, x20 y135 w280 vSniperStats, 🎯 Sniper: 0
+    Gui, Status:Add, Text, x20 y150 w280 vAmmoStats, 💰 Ammo Bought: 0
+    
+    Gui, Status:Font, s7 norm c666666, Segoe UI
+    Gui, Status:Add, Text, x20 y170 w280, ═══════════ CONTROLS ═══════════
+    Gui, Status:Font, s8 norm c888888, Segoe UI
+    Gui, Status:Add, Text, x20 y185 w280, F1  • Toggle ON/OFF
+    Gui, Status:Add, Text, x20 y200 w280, F2  • Show/Hide GUI
+    Gui, Status:Add, Text, x20 y215 w280, F3  • Buy Ammo
+    Gui, Status:Add, Text, x20 y230 w280, R   • Rocket Quick-Switch
+    Gui, Status:Add, Text, x20 y245 w280, N   • Sniper Quick-Switch
+    
+    Gui, Status:Font, s7 bold c00FF88, Segoe UI
+    Gui, Status:Add, Text, x20 y270 w280 Center vFooterText, Press F1 to Enable
+    
+    WinSet, Transparent, 0, A
+    
+    SysGet, WorkArea, MonitorWorkArea
+    xPos := WorkAreaRight - 340
+    yPos := WorkAreaTop + 20
+    Gui, Status:Show, x%xPos% y%yPos% w320 h300 NoActivate, % ScriptName
+    
+    FadeInGUI()
+    SetTimer, AutoHideGUI, -%GUI_AUTO_HIDE_TIME%
+    SetTimer, MonitorGTA5, 5000
+}
+
+MonitorGTA5:
+    global gta5Detected
+    Process, Exist, GTA5.exe
+    newStatus := (ErrorLevel > 0)
+    
+    if (newStatus != gta5Detected) {
+        gta5Detected := newStatus
+        
+        if (gta5Detected) {
+            Gui, Status:Font, s7 bold c00FF88, Segoe UI
+            GuiControl, Status:Font, GTA5Status
+            GuiControl, Status:, GTA5Status, ✅ GTA5 Connected
+            ShowFeatureNotification("GTA5 Detected", "🎮")
+        } else {
+            Gui, Status:Font, s7 bold cFFAA00, Segoe UI
+            GuiControl, Status:Font, GTA5Status
+            GuiControl, Status:, GTA5Status, ⚠ GTA5 Not Detected
+        }
+    }
+    return
+
+CreateMiniIndicator() {
+    global
+    
+    Gui, Mini:New, +AlwaysOnTop +ToolWindow -Caption +LastFound +E0x20
+    Gui, Mini:Color, 0F0F0F
+    
+    Gui, Mini:Font, s10 bold cFF4444, Segoe UI
+    Gui, Mini:Add, Text, x8 y5 w20 h20 vMiniIcon Center, ●
+    
+    Gui, Mini:Font, s7 bold cFFFFFF, Segoe UI
+    Gui, Mini:Add, Text, x30 y8 w35 vMiniLabel, GTA5
+    
+    WinSet, Transparent, 200
+    
+    SysGet, WorkArea, MonitorWorkArea
+    xPos := WorkAreaRight - 80
+    yPos := WorkAreaTop + 5
+    Gui, Mini:Show, x%xPos% y%yPos% w75 h30 NoActivate, GTA5 Mini
+}
+
+UpdateMiniIndicator(enabled) {
+    if (enabled) {
+        Gui, Mini:Font, s10 bold c00FF88, Segoe UI
+        GuiControl, Mini:Font, MiniIcon
+        GuiControl, Mini:, MiniIcon, ●
+        Gui, Mini:Color, 0d1a0d
+    } else {
+        Gui, Mini:Font, s10 bold cFF4444, Segoe UI
+        GuiControl, Mini:Font, MiniIcon
+        GuiControl, Mini:, MiniIcon, ●
+        Gui, Mini:Color, 1a0d0d
+    }
+}
+
+ShowFeatureNotification(featureName, icon) {
+    global
+    
+    Gui, Notify:New, +AlwaysOnTop +ToolWindow -Caption +LastFound +E0x20
+    Gui, Notify:Color, 1a1a1a
+    
+    Gui, Notify:Font, s10 bold c00FF88, Segoe UI
+    Gui, Notify:Add, Text, x15 y10 w150 Center, % icon . " " . featureName
+    
+    WinSet, Transparent, 0
+    
+    SysGet, WorkArea, MonitorWorkArea
+    xPos := WorkAreaRight - 200
+    yPos := WorkAreaTop + 5
+    Gui, Notify:Show, x%xPos% y%yPos% w180 h40 NoActivate, Notify
+    
+    Loop, 15 {
+        opacity := A_Index * 17
+        WinSet, Transparent, %opacity%, Notify
+        Sleep, 10
+    }
+    
+    SetTimer, HideNotification, -1500
+    return
+    
+    HideNotification:
+        Loop, 15 {
+            opacity := 255 - (A_Index * 17)
+            WinSet, Transparent, %opacity%, Notify
+            Sleep, 10
+        }
+        Gui, Notify:Destroy
+        return
+}
+
+UpdateStats() {
+    global rocketUseCount, sniperUseCount, ammoUseCount
+    GuiControl, Status:, RocketStats, 🚀 Rockets: %rocketUseCount%
+    GuiControl, Status:, SniperStats, 🎯 Sniper: %sniperUseCount%
+    GuiControl, Status:, AmmoStats, 💰 Ammo Bought: %ammoUseCount%
+}
+
+FadeInGUI() {
+    global GUI_FADE_SPEED
+    Loop, 17 {
+        opacity := A_Index * 15
+        WinSet, Transparent, %opacity%, GTA5 Enhanced
+        Sleep, GUI_FADE_SPEED
+    }
+}
+
+FadeOutGUI() {
+    global GUI_FADE_SPEED
+    Loop, 17 {
+        opacity := 255 - (A_Index * 15)
+        WinSet, Transparent, %opacity%, GTA5 Enhanced
+        Sleep, GUI_FADE_SPEED
+    }
+    Gui, Status:Hide
+}
+
+ShowGUI() {
+    global GUI_AUTO_HIDE_TIME
+    
+    ; Check if window exists and is visible
+    WinGet, guiID, ID, GTA5 Enhanced
+    
+    SysGet, WorkArea, MonitorWorkArea
+    xPos := WorkAreaRight - 340
+    yPos := WorkAreaTop + 20
+    
+    if (!guiID) {
+        ; GUI is hidden, show it with fade-in
+        Gui, Status:Show, x%xPos% y%yPos% NoActivate
+        FadeInGUI()
+    } else {
+        ; GUI is already visible, reset transparency
+        WinSet, Transparent, 255, GTA5 Enhanced
+    }
+    
+    ; Reset auto-hide timer
+    SetTimer, AutoHideGUI, -%GUI_AUTO_HIDE_TIME%
+}
+
+AutoHideGUI:
+    FadeOutGUI()
+    return
+
+ToggleScript() {
+    global scriptEnabled
+    scriptEnabled := !scriptEnabled
+    UpdateStatusGUI(scriptEnabled)
+    UpdateMiniIndicator(scriptEnabled)
+    PlayToggleFeedback(scriptEnabled)
+}
+
+UpdateStatusGUI(enabled) {
+    global ScriptName
+    
+    if (enabled) {
+        Gui, Status:Color, 0d1a0d
+        
+        Gui, Status:Font, s16 bold c00FF88, Segoe UI
+        GuiControl, Status:Font, StatusIcon
+        GuiControl, Status:, StatusIcon, ●
+        
+        Gui, Status:Font, s13 bold c00FF88, Segoe UI
+        GuiControl, Status:Font, StatusText
+        GuiControl, Status:, StatusText, ⚡ ACTIVE
+        
+        Gui, Status:Font, s7 bold c00FF88, Segoe UI
+        GuiControl, Status:Font, FooterText
+        GuiControl, Status:, FooterText, 🎮 Ready
+        
+        Loop, 3 {
+            WinSet, Transparent, 220, GTA5 Enhanced
+            Sleep, 50
+            WinSet, Transparent, 255, GTA5 Enhanced
+            Sleep, 50
+        }
+    } else {
+        Gui, Status:Color, 1a0d0d
+        
+        Gui, Status:Font, s16 bold cFF4444, Segoe UI
+        GuiControl, Status:Font, StatusIcon
+        GuiControl, Status:, StatusIcon, ●
+        
+        Gui, Status:Font, s13 bold cFF4444, Segoe UI
+        GuiControl, Status:Font, StatusText
+        GuiControl, Status:, StatusText, DISABLED
+        
+        Gui, Status:Font, s7 bold cFF4444, Segoe UI
+        GuiControl, Status:Font, FooterText
+        GuiControl, Status:, FooterText, Press F1 to Enable
+        
+        Loop, 2 {
+            WinSet, Transparent, 200, GTA5 Enhanced
+            Sleep, 50
+            WinSet, Transparent, 255, GTA5 Enhanced
+            Sleep, 50
+        }
+    }
+    
+    ShowGUI()
+}
+
+PlayToggleFeedback(enabled) {
+    if (enabled) {
+        SoundBeep, 800, 60
+        Sleep, 40
+        SoundBeep, 1000, 60
+        Sleep, 40
+        SoundBeep, 1200, 60
+    } else {
+        SoundBeep, 600, 60
+        Sleep, 40
+        SoundBeep, 400, 60
+    }
+}
+
+QuickWeaponSwitch(fromSlot, toSlot) {
+    global QUICK_SWITCH_DELAY
+    Send, %fromSlot%
+    Sleep, QUICK_SWITCH_DELAY
+    Send, %toSlot%
+}
+
+ExecuteAmmoPurchase() {
+    global MENU_NAV_DELAY, MENU_ACTION_DELAY
+    
+    Send, m
+    Sleep, MENU_ACTION_DELAY
+    
+    Loop, 4 {
+        Send, {Down}
+        Sleep, MENU_NAV_DELAY
+    }
+    Sleep, MENU_NAV_DELAY
+    
+    Send, {Enter}
+    Sleep, MENU_ACTION_DELAY
+    Send, {Enter}
+    Sleep, MENU_ACTION_DELAY
+    
+    Send, {Left}
+    Sleep, MENU_NAV_DELAY
+    Send, {Up}
+    Sleep, MENU_NAV_DELAY
+    
+    Send, {Enter}
+    Sleep, MENU_NAV_DELAY
+}
+
+F1::
+    ToggleScript()
+    return
+
+F2::
+    ; Check if window exists
+    WinGet, guiID, ID, GTA5 Enhanced
+    if (guiID) {
+        ; GUI is visible, hide it
+        FadeOutGUI()
+    } else {
+        ; GUI is hidden, show it
+        ShowGUI()
+    }
+    return
+
+F3::
+    if (!scriptEnabled)
+        return
+    ammoUseCount++
+    UpdateStats()
+    ShowFeatureNotification("AMMO PURCHASE", "💰")
+    SoundBeep, 1500, 30
+    ExecuteAmmoPurchase()
+    return
+
+$r::
+    if (!scriptEnabled) {
+        Send, r
+        return
+    }
+    rocketUseCount++
+    UpdateStats()
+    ShowFeatureNotification("ROCKET SPAM", "🚀")
+    SoundBeep, 1800, 20
+    QuickWeaponSwitch(WEAPON_SLOT_C4, WEAPON_SLOT_ROCKET)
+    return
+
+$n::
+    if (!scriptEnabled) {
+        Send, n
+        return
+    }
+    sniperUseCount++
+    UpdateStats()
+    ShowFeatureNotification("SNIPER MODE", "🎯")
+    SoundBeep, 2000, 20
+    QuickWeaponSwitch(WEAPON_SLOT_C4, WEAPON_SLOT_SNIPER)
+    return
+
+GuiClose:
+GuiEscape:
+ExitApp
+    return
